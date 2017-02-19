@@ -22,6 +22,7 @@ import mesosphere.marathon.stream.Implicits._
 import mesosphere.mesos.TaskBuilder
 import mesosphere.mesos.protos.{ Resource, ScalarResource }
 import org.apache.mesos.{ Protos => mesos }
+import spray.http.Uri
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -397,7 +398,7 @@ object AppDefinition extends GeneralPurposeCombinators {
 
   val DefaultConstraints = Set.empty[Constraint]
 
-  val DefaultUris = Seq.empty[String]
+  val DefaultUris = Seq.empty[Uri]
 
   val DefaultFetch: Seq[FetchUri] = FetchUri.empty
 

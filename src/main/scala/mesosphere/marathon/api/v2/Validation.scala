@@ -9,6 +9,7 @@ import mesosphere.marathon.ValidationFailedException
 import mesosphere.marathon.state.FetchUri
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
+import spray.http.StringRendering
 
 import scala.collection.GenTraversableOnce
 import scala.util.matching.Regex
@@ -151,10 +152,10 @@ object Validation {
     new Validator[FetchUri] {
       def apply(uri: FetchUri) = {
         try {
-          new URI(uri.uri)
+          new URI(uri.uri.render(new StringRendering).get)
           Success
         } catch {
-          case _: URISyntaxException => Failure(Set(RuleViolation(uri.uri, "URI has invalid syntax.", None)))
+          case _: URISyntaxException => Failure(Set(RuleViolation(uri.uri.render(new StringRendering).get, "URI has invalid syntax.", None)))
         }
       }
     }

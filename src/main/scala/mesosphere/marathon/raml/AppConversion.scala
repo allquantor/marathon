@@ -4,6 +4,7 @@ package raml
 import java.time.OffsetDateTime
 
 import mesosphere.marathon.state.{ AppDefinition, FetchUri, PathId, Residency }
+import spray.http.StringRendering
 
 trait AppConversion extends ConstraintConversion with EnvVarConversion with SecretConversion with NetworkConversion
     with ReadinessConversions with HealthCheckConversion with UnreachableStrategyConversion with KillSelectionConversion {
@@ -11,7 +12,7 @@ trait AppConversion extends ConstraintConversion with EnvVarConversion with Secr
   implicit val pathIdWrites: Writes[PathId, String] = Writes { _.toString }
 
   implicit val artifactWrites: Writes[FetchUri, Artifact] = Writes { fetch =>
-    Artifact(fetch.uri, Some(fetch.extract), Some(fetch.executable), Some(fetch.cache))
+    Artifact(fetch.uri.render(new StringRendering).get, Some(fetch.extract), Some(fetch.executable), Some(fetch.cache))
   }
 
   implicit val upgradeStrategyWrites: Writes[state.UpgradeStrategy, UpgradeStrategy] = Writes { strategy =>

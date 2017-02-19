@@ -6,19 +6,20 @@ import mesosphere.UnitTest
 import mesosphere.marathon.Protos.Constraint
 import mesosphere.marathon.api.JsonTestHelper
 import mesosphere.marathon.api.v2.ValidationHelper
-import mesosphere.marathon.core.health.{ MarathonHttpHealthCheck, MesosCommandHealthCheck, MesosHttpHealthCheck, PortReference }
+import mesosphere.marathon.core.health.{MarathonHttpHealthCheck, MesosCommandHealthCheck, MesosHttpHealthCheck, PortReference}
 import mesosphere.marathon.core.plugin.PluginManager
 import mesosphere.marathon.core.readiness.ReadinessCheckTestHelper
 import mesosphere.marathon.raml.Resources
-import mesosphere.marathon.state.Container.{ Docker, PortMapping }
+import mesosphere.marathon.state.Container.{Docker, PortMapping}
 import mesosphere.marathon.state.DiscoveryInfo.Port
 import mesosphere.marathon.state.EnvVarValue._
 import mesosphere.marathon.state.PathId._
 import mesosphere.marathon.state._
 import mesosphere.marathon.test.MarathonTestHelper
-import org.apache.mesos.{ Protos => mesos }
+import org.apache.mesos.{Protos => mesos}
 import play.api.data.validation.ValidationError
-import play.api.libs.json.{ JsError, Json }
+import play.api.libs.json.{JsError, Json}
+import spray.http.StringRendering
 
 import scala.collection.immutable.Seq
 import scala.concurrent.duration._
@@ -734,10 +735,30 @@ class AppDefinitionTest extends UnitTest {
 
       val app = fromJson(json)
 
-      assert(app.fetch(0).uri == "http://example.com/file1.tar.gz")
+      assert(app.fetch(0).uri.render(new StringRendering).get == "http://example.com/file1.tar.gz")
       assert(app.fetch(0).extract)
 
-      assert(app.fetch(1).uri == "http://example.com/file")
+      assert(app.fetch(1).uri.render(new StringRendering).get== "http://example.com/file")
+      assert(!app.fetch(1).extract)
+
+    }
+
+    "Transfer uris with query strings to fetch" in {
+      val json =
+        """
+      {
+        "id": "app-with-fetch",
+        "cmd": "brew update",
+        "uris": ["http://example.com/file1.tar.gz?foo=10&bar=meh", "http://example.com/file?foo=10&bar=meh"]
+      }
+      """
+
+      val app = fromJson(json)
+
+      assert(app.fetch(0).uri.render(new StringRendering).get == "http://example.com/file1.tar.gz?foo=10&bar=meh")
+      assert(app.fetch(0).extract)
+
+      assert(app.fetch(1).uri.render(new StringRendering).get == "http://example.com/file?foo=10&bar=meh")
       assert(!app.fetch(1).extract)
 
     }
@@ -758,12 +779,12 @@ class AppDefinitionTest extends UnitTest {
 
       val deserializedApp = AppDefinition.fromProto(proto)
 
-      assert(deserializedApp.fetch(0).uri == "http://example.com/file1")
+      assert(deserializedApp.fetch(0).uri.render(new StringRendering).get == "http://example.com/file1")
       assert(deserializedApp.fetch(0).extract)
       assert(!deserializedApp.fetch(0).executable)
       assert(deserializedApp.fetch(0).cache)
 
-      assert(deserializedApp.fetch(1).uri == "http://example.com/file2")
+      assert(deserializedApp.fetch(1).uri.render(new StringRendering).get == "http://example.com/file2")
       assert(!deserializedApp.fetch(1).extract)
       assert(deserializedApp.fetch(1).executable)
       assert(!deserializedApp.fetch(1).cache)

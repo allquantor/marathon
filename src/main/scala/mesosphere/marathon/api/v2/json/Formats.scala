@@ -16,7 +16,7 @@ import mesosphere.marathon.core.pod.PodDefinition
 import mesosphere.marathon.core.readiness.ReadinessCheck
 import mesosphere.marathon.core.task.Task
 import mesosphere.marathon.core.task.state.NetworkInfo
-import mesosphere.marathon.raml.{ Pod, Raml, Resources, KillSelection }
+import mesosphere.marathon.raml.{ KillSelection, Pod, Raml, Resources }
 import mesosphere.marathon.state._
 import org.apache.mesos.Protos.ContainerInfo
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo
@@ -25,6 +25,7 @@ import play.api.data.validation.ValidationError
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
+import spray.http.{ StringRendering, Uri }
 
 import scala.concurrent.duration._
 
@@ -32,6 +33,23 @@ import scala.concurrent.duration._
 // See https://mesosphere.atlassian.net/browse/MARATHON-1291
 // https://mesosphere.atlassian.net/browse/MARATHON-1292
 object Formats extends Formats {
+
+  implicit class FormatAsUri(val format: OFormat[String]) extends AnyVal {
+    def asUri: OFormat[Uri] =
+      format.inmap(
+        Uri.apply,
+        _.path.render(new StringRendering).get)
+  }
+  implicit class ReadAsUris(val reads: Reads[Option[Seq[String]]]) extends AnyVal {
+    def asUris: Reads[Option[Seq[Uri]]] = {
+      reads.map { read =>
+        read.flatMap { uris =>
+          Some(uris.map(Uri.apply))
+        }
+      }
+    }
+
+  }
 
   implicit class ReadsWithDefault[A](val reads: Reads[Option[A]]) extends AnyVal {
     def withDefault(a: A): Reads[A] = reads.map(_.getOrElse(a))
@@ -889,7 +907,7 @@ trait FetchUriFormats {
 
   implicit lazy val FetchUriFormat: Format[FetchUri] = {
     (
-      (__ \ "uri").format[String] ~
+      (__ \ "uri").format[String].asUri ~
       (__ \ "extract").formatNullable[Boolean].withDefault(true) ~
       (__ \ "executable").formatNullable[Boolean].withDefault(false) ~
       (__ \ "cache").formatNullable[Boolean].withDefault(false) ~
@@ -1003,7 +1021,7 @@ trait AppAndGroupFormats {
         healthChecks = checks)).flatMap { app =>
         // necessary because of case class limitations (good for another 21 fields)
         case class ExtraFields(
-            uris: Seq[String],
+            uris: Seq[Uri],
             fetch: Seq[FetchUri],
             dependencies: Set[PathId],
             maybePorts: Option[Seq[Int]],
@@ -1032,7 +1050,7 @@ trait AppAndGroupFormats {
 
         val extraReads: Reads[ExtraFields] =
           (
-            (__ \ "uris").readNullable[Seq[String]].withDefault(AppDefinition.DefaultUris) ~
+            (__ \ "uris").readNullable[Seq[String]].asUris.withDefault(AppDefinition.DefaultUris) ~
             (__ \ "fetch").readNullable[Seq[FetchUri]].withDefault(AppDefinition.DefaultFetch) ~
             (__ \ "dependencies").readNullable[Set[PathId]].withDefault(AppDefinition.DefaultDependencies) ~
             (__ \ "ports").readNullable[Seq[Int]](uniquePorts) ~
@@ -1194,7 +1212,7 @@ trait AppAndGroupFormats {
         "gpus" -> runSpec.resources.gpus,
         "executor" -> runSpec.executor,
         "constraints" -> runSpec.constraints,
-        "uris" -> runSpec.fetch.map(_.uri),
+        "uris" -> runSpec.fetch.map(_.uri.render(new StringRendering).get),
         "fetch" -> runSpec.fetch,
         "storeUrls" -> runSpec.storeUrls,
         "backoffSeconds" -> runSpec.backoffStrategy.backoff,
